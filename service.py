@@ -81,7 +81,10 @@ class ProductService:
 
 
 class CartService:
-    def __init__(self, cartRepo: CartRepository, productRepo: ProductRepository, userRepo: UserRepository, sessionFactory):
+    def __init__(
+        self, cartRepo: CartRepository, productRepo: ProductRepository,
+        userRepo: UserRepository, sessionFactory
+    ):
         self._cartRepo = cartRepo
         self._productRepo = productRepo
         self._userRepo = userRepo
@@ -162,12 +165,14 @@ class CartService:
             if existing:
                 newQty = existing["quantity"] + quantity
                 if newQty > product["stock"]:
-                    logWarning("add_item", "insufficient stock", {"product_id": productId, "requested": newQty, "available": product["stock"]})
+                    logWarning("add_item", "insufficient stock",
+                               {"product_id": productId, "requested": newQty, "available": product["stock"]})
                     raise HTTPException(400, f"Only {product['stock']} units available.")
                 item = self._cartRepo.updateItemQuantity(cart["id"], productId, newQty)
             else:
                 if quantity > product["stock"]:
-                    logWarning("add_item", "insufficient stock", {"product_id": productId, "requested": quantity, "available": product["stock"]})
+                    logWarning("add_item", "insufficient stock",
+                               {"product_id": productId, "requested": quantity, "available": product["stock"]})
                     raise HTTPException(400, f"Only {product['stock']} units available.")
                 item = self._cartRepo.addItem(cart["id"], {
                     "product_id": productId,
@@ -177,7 +182,10 @@ class CartService:
                     "subtotal": round(product["price"] * quantity, 2),
                 })
 
-            logRequest("add_item", {"item_id": item["id"], "cart_id": cart["id"], "user_id": userId, "product_id": productId, "quantity": item["quantity"], "subtotal": item["subtotal"]})
+            logRequest("add_item", {
+                "item_id": item["id"], "cart_id": cart["id"], "user_id": userId,
+                "product_id": productId, "quantity": item["quantity"], "subtotal": item["subtotal"],
+            })
             return item
         except HTTPException:
             raise
@@ -220,7 +228,10 @@ class CartService:
                 raise HTTPException(400, "Cart is empty.")
 
             stockErrors = [
-                {"product": i["product_name"], "requested": i["quantity"], "available": self._productRepo.get(i["product_id"])["stock"]}
+                {
+                    "product": i["product_name"], "requested": i["quantity"],
+                    "available": self._productRepo.get(i["product_id"])["stock"],
+                }
                 for i in cartItems
                 if i["quantity"] > self._productRepo.get(i["product_id"])["stock"]
             ]
