@@ -1,8 +1,54 @@
 from fastapi import HTTPException
 
 from exceptions import DatabaseConnectionException, DatabaseException, DuplicateRecordException
-from repository import CartRepository, ProductRepository
+from repository import CartRepository, ProductRepository, UserRepository
 from utils import logDbError, logRequest, logWarning
+
+
+class UserService:
+    def __init__(self, repo: UserRepository):
+        self._repo = repo
+
+    def create(self, name: str, email: str):
+        try:
+            user = self._repo.create(name, email)
+            logRequest("create_user", {"id": user["id"], "name": name, "email": email})
+            return user
+        except DuplicateRecordException:
+            logWarning("create_user", "email already exists", {"email": email})
+            raise HTTPException(400, "Email already registered.")
+        except DatabaseConnectionException as e:
+            logDbError("create_user", e)
+            raise HTTPException(503, "Database unavailable. Try again later.")
+        except DatabaseException as e:
+            logDbError("create_user", e)
+            raise HTTPException(500, "An unexpected database error occurred.")
+
+    def get(self, userId: int):
+        try:
+            user = self._repo.get(userId)
+            if not user:
+                logWarning("get_user", "user not found", {"user_id": userId})
+                raise HTTPException(404, "User not found.")
+            return user
+        except HTTPException:
+            raise
+        except DatabaseConnectionException as e:
+            logDbError("get_user", e)
+            raise HTTPException(503, "Database unavailable. Try again later.")
+        except DatabaseException as e:
+            logDbError("get_user", e)
+            raise HTTPException(500, "An unexpected database error occurred.")
+
+    def listAll(self):
+        try:
+            return self._repo.listAll()
+        except DatabaseConnectionException as e:
+            logDbError("list_users", e)
+            raise HTTPException(503, "Database unavailable. Try again later.")
+        except DatabaseException as e:
+            logDbError("list_users", e)
+            raise HTTPException(500, "An unexpected database error occurred.")
 
 
 class ProductService:
@@ -12,7 +58,7 @@ class ProductService:
     def create(self, name, price, stock):
         try:
             product = self._repo.create(name, price, stock)
-            logRequest("create_product", {"name": name, "price": price, "stock": stock})
+            logRequest("create_product", {"id": product["id"], "name": name, "price": price, "stock": stock})
             return product
         except DuplicateRecordException:
             raise HTTPException(409, "Product already exists.")
@@ -35,18 +81,22 @@ class ProductService:
 
 
 class CartService:
-    def __init__(self, cartRepo: CartRepository, productRepo: ProductRepository, client):
+    def __init__(self, cartRepo: CartRepository, productRepo: ProductRepository, userRepo: UserRepository, sessionFactory):
         self._cartRepo = cartRepo
         self._productRepo = productRepo
-        self._client = client
+        self._userRepo = userRepo
+        self._sessionFactory = sessionFactory
 
     def create(self, userId):
         try:
+            if not self._userRepo.get(userId):
+                logWarning("create_cart", "user not found", {"user_id": userId})
+                raise HTTPException(404, "User not found.")
             if self._cartRepo.get(userId):
                 logWarning("create_cart", "cart already exists", {"user_id": userId})
                 raise HTTPException(400, "Cart already exists.")
             cart = self._cartRepo.create(userId)
-            logRequest("create_cart", {"user_id": userId})
+            logRequest("create_cart", {"cart_id": cart["id"], "user_id": userId})
             return cart
         except HTTPException:
             raise
@@ -127,7 +177,7 @@ class CartService:
                     "subtotal": round(product["price"] * quantity, 2),
                 })
 
-            logRequest("add_item", {"user_id": userId, "product_id": productId, "quantity": quantity})
+            logRequest("add_item", {"item_id": item["id"], "cart_id": cart["id"], "user_id": userId, "product_id": productId, "quantity": item["quantity"], "subtotal": item["subtotal"]})
             return item
         except HTTPException:
             raise
@@ -180,16 +230,23 @@ class CartService:
 
             total = 0.0
             order = []
-            with self._client.start_session() as session:
-                with session.start_transaction():
-                    for i in cartItems:
-                        self._productRepo.updateStock(i["product_id"], i["quantity"], session=session)
-                        subtotal = round(i["price"] * i["quantity"], 2)
-                        total += subtotal
-                        order.append({"product": i["product_name"], "quantity": i["quantity"], "subtotal": subtotal})
-                    self._cartRepo.clearItems(cart["id"], session=session)
-                    self._cartRepo.updateStatus(cart["id"], "checked_out", session=session)
-            logRequest("checkout", {"user_id": userId, "total": total})
+            session = self._sessionFactory()
+            try:
+                for i in cartItems:
+                    self._productRepo.updateStock(i["product_id"], i["quantity"], session=session)
+                    subtotal = round(i["price"] * i["quantity"], 2)
+                    total += subtotal
+                    order.append({"product": i["product_name"], "quantity": i["quantity"], "subtotal": subtotal})
+                self._cartRepo.clearItems(cart["id"], session=session)
+                self._cartRepo.updateStatus(cart["id"], "checked_out", session=session)
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+
+            logRequest("checkout", {"user_id": userId, "item_count": len(order), "total": round(total, 2)})
             return {"message": "Checkout successful.", "order": order, "total": round(total, 2)}
         except HTTPException:
             raise

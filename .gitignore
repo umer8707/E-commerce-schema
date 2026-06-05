@@ -4,3 +4,4 @@ __pycache__/
 .env
 app.log
 server.log
+test_cart.db

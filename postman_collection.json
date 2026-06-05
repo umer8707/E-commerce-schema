@@ -1,0 +1,770 @@
+{
+    "info": {
+        "name": "E-commerce Cart API - Full Test Suite",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {"key": "base_url", "value": "http://127.0.0.1:8000"},
+        {"key": "user_id", "value": ""},
+        {"key": "user_id_2", "value": ""},
+        {"key": "user_email", "value": ""},
+        {"key": "user_email_2", "value": ""},
+        {"key": "product_id", "value": ""},
+        {"key": "product_id_2", "value": ""},
+        {"key": "item_id", "value": ""},
+        {"key": "item_id_2", "value": ""},
+        {"key": "product_count_after_bulk", "value": "0"},
+        {"key": "initial_shoes_stock", "value": "0"}
+    ],
+    "item": [
+        {
+            "name": "1 - Users",
+            "item": [
+                {
+                    "name": "01 - Create User",
+                    "event": [
+                        {"listen": "prerequest", "script": {"exec": [
+                            "pm.collectionVariables.set('user_email', 'user_' + Date.now() + '@test.com');"
+                        ]}},
+                        {"listen": "test", "script": {"exec": [
+                            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                            "pm.test('Returns id name email', () => {",
+                            "    const d = pm.response.json();",
+                            "    pm.expect(d).to.have.property('id');",
+                            "    pm.expect(d).to.have.property('name');",
+                            "    pm.expect(d).to.have.property('email');",
+                            "});",
+                            "pm.collectionVariables.set('user_id', pm.response.json().id);"
+                        ]}}
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/users",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"name\": \"Test User\", \"email\": \"{{user_email}}\"}"}
+                    }
+                },
+                {
+                    "name": "02 - Create User - Duplicate Email Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Already registered message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('already registered'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/users",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"name\": \"Other\", \"email\": \"{{user_email}}\"}"}
+                    }
+                },
+                {
+                    "name": "03 - Create User - Missing Name Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/users",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"email\": \"nope@test.com\"}"}
+                    }
+                },
+                {
+                    "name": "04 - Create User - Missing Email Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/users",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"name\": \"NoEmail\"}"}
+                    }
+                },
+                {
+                    "name": "05 - Create Second User",
+                    "event": [
+                        {"listen": "prerequest", "script": {"exec": [
+                            "pm.collectionVariables.set('user_email_2', 'user2_' + Date.now() + '@test.com');"
+                        ]}},
+                        {"listen": "test", "script": {"exec": [
+                            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                            "pm.collectionVariables.set('user_id_2', pm.response.json().id);"
+                        ]}}
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/users",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"name\": \"User Two\", \"email\": \"{{user_email_2}}\"}"}
+                    }
+                },
+                {
+                    "name": "06 - Get User By ID",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Returns correct user', () => {",
+                        "    const d = pm.response.json();",
+                        "    pm.expect(d.id).to.eql(parseInt(pm.collectionVariables.get('user_id')));",
+                        "    pm.expect(d).to.have.property('name');",
+                        "    pm.expect(d).to.have.property('email');",
+                        "});"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/users/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "07 - Get User Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/users/99999"
+                    }
+                },
+                {
+                    "name": "08 - List Users",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                        "pm.test('Has at least 2 users', () => pm.expect(pm.response.json().length).to.be.gte(2));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/users"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2 - Products",
+            "item": [
+                {
+                    "name": "09 - Create Products Bulk",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('Returns array of 2', () => pm.expect(pm.response.json()).to.have.lengthOf(2));",
+                        "pm.test('First product has id', () => pm.expect(pm.response.json()[0]).to.have.property('id'));",
+                        "pm.collectionVariables.set('product_id', pm.response.json()[0].id);",
+                        "pm.collectionVariables.set('product_id_2', pm.response.json()[1].id);",
+                        "pm.collectionVariables.set('initial_shoes_stock', pm.response.json()[0].stock);"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[\n  {\"name\": \"Shoes\", \"price\": 49.99, \"stock\": 10},\n  {\"name\": \"Shirt\", \"price\": 19.99, \"stock\": 20}\n]"}
+                    }
+                },
+                {
+                    "name": "10 - List Products Non-Empty",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                        "pm.test('Has at least 2 products', () => pm.expect(pm.response.json().length).to.be.gte(2));",
+                        "pm.collectionVariables.set('product_count_after_bulk', pm.response.json().length);"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/products"
+                    }
+                },
+                {
+                    "name": "11 - Create Single Product",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('Correct name', () => pm.expect(pm.response.json()[0].name).to.eql('Cap'));",
+                        "pm.test('Correct price', () => pm.expect(pm.response.json()[0].price).to.eql(9.99));",
+                        "pm.test('Correct stock', () => pm.expect(pm.response.json()[0].stock).to.eql(5));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[{\"name\": \"Cap\", \"price\": 9.99, \"stock\": 5}]"}
+                    }
+                },
+                {
+                    "name": "12 - List Products Returns All",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Has one more product than before bulk', () => {",
+                        "    const before = parseInt(pm.collectionVariables.get('product_count_after_bulk'));",
+                        "    pm.expect(pm.response.json().length).to.eql(before + 1);",
+                        "});"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/products"
+                    }
+                },
+                {
+                    "name": "13 - Create Product - Price Zero Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[{\"name\": \"Free\", \"price\": 0, \"stock\": 5}]"}
+                    }
+                },
+                {
+                    "name": "14 - Create Product - Negative Price Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[{\"name\": \"Bad\", \"price\": -10.0, \"stock\": 5}]"}
+                    }
+                },
+                {
+                    "name": "15 - Create Product - Negative Stock Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[{\"name\": \"Bad\", \"price\": 10.0, \"stock\": -1}]"}
+                    }
+                },
+                {
+                    "name": "16 - Create Product - Missing Name Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/products",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "[{\"price\": 10.0, \"stock\": 5}]"}
+                    }
+                }
+            ]
+        },
+        {
+            "name": "3 - Cart Pre-Creation Errors",
+            "item": [
+                {
+                    "name": "17 - Get Cart Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id_2}}"
+                    }
+                },
+                {
+                    "name": "18 - Delete Cart Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id_2}}"
+                    }
+                },
+                {
+                    "name": "19 - Add Item - Cart Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Cart not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('cart not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id_2}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": 1, \"quantity\": 1}"}
+                    }
+                },
+                {
+                    "name": "20 - Remove Item - Cart Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Cart not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('cart not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id_2}}/items/1"
+                    }
+                },
+                {
+                    "name": "21 - Checkout - Cart Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id_2}}/checkout"
+                    }
+                },
+                {
+                    "name": "22 - Create Cart - Nonexistent User Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('User not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('user not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/99999"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4 - Cart CRUD",
+            "item": [
+                {
+                    "name": "23 - Create Cart",
+                    "event": [
+                        {"listen": "prerequest", "script": {"exec": [
+                            "pm.sendRequest({ url: pm.collectionVariables.get('base_url') + '/cart/' + pm.collectionVariables.get('user_id'), method: 'DELETE' }, function() {});"
+                        ]}},
+                        {"listen": "test", "script": {"exec": [
+                            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                            "pm.test('Status is active', () => pm.expect(pm.response.json().status).to.eql('active'));",
+                            "pm.test('Has id field', () => pm.expect(pm.response.json()).to.have.property('id'));",
+                            "pm.test('Has user_id field', () => pm.expect(pm.response.json()).to.have.property('user_id'));"
+                        ]}}
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "24 - Create Duplicate Cart Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Already exists message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('already exists'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "25 - Get Empty Cart",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Has cart items total keys', () => {",
+                        "    const d = pm.response.json();",
+                        "    pm.expect(d).to.have.all.keys('cart', 'items', 'total');",
+                        "});",
+                        "pm.test('Items is empty', () => pm.expect(pm.response.json().items).to.eql([]));",
+                        "pm.test('Total is zero', () => pm.expect(pm.response.json().total).to.eql(0));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "26 - Cart Status Active On Creation",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Cart status is active', () => pm.expect(pm.response.json().cart.status).to.eql('active'));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "27 - Delete Cart Success",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "28 - Get Deleted Cart Returns 404",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "29 - Recreate Cart After Delete",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('New cart is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "5 - Cart Items",
+            "item": [
+                {
+                    "name": "30 - Add Item Success",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('Has all required fields', () => {",
+                        "    const d = pm.response.json();",
+                        "    pm.expect(d).to.have.all.keys('id', 'cart_id', 'product_id', 'product_name', 'quantity', 'price', 'subtotal');",
+                        "});",
+                        "pm.test('Quantity is 2', () => pm.expect(pm.response.json().quantity).to.eql(2));",
+                        "pm.collectionVariables.set('item_id', pm.response.json().id);"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 2}"}
+                    }
+                },
+                {
+                    "name": "31 - Add Second Product",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('Subtotal equals price times quantity', () => {",
+                        "    const d = pm.response.json();",
+                        "    pm.expect(d.subtotal).to.eql(parseFloat((d.price * d.quantity).toFixed(2)));",
+                        "});",
+                        "pm.collectionVariables.set('item_id_2', pm.response.json().id);"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id_2}}, \"quantity\": 3}"}
+                    }
+                },
+                {
+                    "name": "32 - Get Cart With 2 Items",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Has 2 items', () => pm.expect(pm.response.json().items).to.have.lengthOf(2));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "33 - Cart Total Matches Sum Of Subtotals",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Total is positive', () => pm.expect(pm.response.json().total).to.be.above(0));",
+                        "pm.test('Total matches item sum', () => {",
+                        "    const d = pm.response.json();",
+                        "    const sum = parseFloat(d.items.reduce((acc, i) => acc + i.price * i.quantity, 0).toFixed(2));",
+                        "    pm.expect(d.total).to.eql(sum);",
+                        "});"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "34 - Add Same Product Merges Quantity",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('Quantity merged to 5', () => pm.expect(pm.response.json().quantity).to.eql(5));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 3}"}
+                    }
+                },
+                {
+                    "name": "35 - Cart Still Has 2 Items After Merge",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Still 2 unique items', () => pm.expect(pm.response.json().items).to.have.lengthOf(2));",
+                        "pm.test('Merged item has quantity 5', () => {",
+                        "    const merged = pm.response.json().items.find(i => i.quantity === 5);",
+                        "    pm.expect(merged).to.exist;",
+                        "});"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "36 - Add Item - Product Not Found",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Product not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('product not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": 9999, \"quantity\": 1}"}
+                    }
+                },
+                {
+                    "name": "37 - Add Item - Quantity Zero Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 0}"}
+                    }
+                },
+                {
+                    "name": "38 - Add Item - Negative Quantity Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": -1}"}
+                    }
+                },
+                {
+                    "name": "39 - Add Item - Missing Product ID Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"quantity\": 1}"}
+                    }
+                },
+                {
+                    "name": "40 - Add Item - Exceeds Stock Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Units available message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('units available'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 999}"}
+                    }
+                },
+                {
+                    "name": "41 - Merged Quantity Exceeds Stock Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Units available message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('units available'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 6}"}
+                    }
+                },
+                {
+                    "name": "42 - String Item ID Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}/items/abc"
+                    }
+                },
+                {
+                    "name": "43 - Remove Second Item Success",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}/items/{{item_id_2}}"
+                    }
+                },
+                {
+                    "name": "44 - Cart Has 1 Item After Removal",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Exactly 1 item remains', () => pm.expect(pm.response.json().items).to.have.lengthOf(1));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "45 - Remove Same Item Again Returns 404",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Item not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('item not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}/items/{{item_id_2}}"
+                    }
+                },
+                {
+                    "name": "46 - Remove Nonexistent Item Returns 404",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Item not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('item not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}/items/99999"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "6 - Checkout",
+            "item": [
+                {
+                    "name": "47 - Checkout Success",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Success message', () => pm.expect(pm.response.json().message).to.eql('Checkout successful.'));",
+                        "pm.test('Has message order total keys', () => {",
+                        "    const d = pm.response.json();",
+                        "    pm.expect(d).to.have.all.keys('message', 'order', 'total');",
+                        "});",
+                        "pm.test('Order has 1 item', () => pm.expect(pm.response.json().order).to.have.lengthOf(1));",
+                        "pm.test('Total is positive', () => pm.expect(pm.response.json().total).to.be.above(0));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/checkout"
+                    }
+                },
+                {
+                    "name": "48 - Cart Items Empty After Checkout",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Items cleared after checkout', () => pm.expect(pm.response.json().items).to.eql([]));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "49 - Cart Status Is Checked Out",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Cart status is checked_out', () => pm.expect(pm.response.json().cart.status).to.eql('checked_out'));"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "50 - Product Stock Decremented After Checkout",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                        "pm.test('Shoes stock reduced by 5', () => {",
+                        "    const pid = parseInt(pm.collectionVariables.get('product_id'));",
+                        "    const shoes = pm.response.json().find(p => p.id === pid);",
+                        "    const initialStock = parseInt(pm.collectionVariables.get('initial_shoes_stock'));",
+                        "    pm.expect(shoes.stock).to.eql(initialStock - 5);",
+                        "});"
+                    ]}}],
+                    "request": {
+                        "method": "GET",
+                        "url": "{{base_url}}/products"
+                    }
+                },
+                {
+                    "name": "51 - Checkout Again Rejected - Cart Empty",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Empty message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('empty'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/checkout"
+                    }
+                },
+                {
+                    "name": "52 - Add Item To Checked Out Cart Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Checked out message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('checked out'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/items",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\"product_id\": {{product_id}}, \"quantity\": 1}"}
+                    }
+                },
+                {
+                    "name": "53 - Remove Item From Checked Out Cart Returns 404",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                        "pm.test('Item not found message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('item not found'));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}/items/{{item_id}}"
+                    }
+                },
+                {
+                    "name": "54 - Delete Checked Out Cart",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                    ]}}],
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "55 - Create New Cart After Deleting Checked Out",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                        "pm.test('New cart is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}"
+                    }
+                },
+                {
+                    "name": "56 - Checkout Empty Cart Rejected",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                        "pm.test('Empty cart message', () => pm.expect(pm.response.json().detail.toLowerCase()).to.include('empty'));"
+                    ]}}],
+                    "request": {
+                        "method": "POST",
+                        "url": "{{base_url}}/cart/{{user_id}}/checkout"
+                    }
+                }
+            ]
+        }
+    ]
+}

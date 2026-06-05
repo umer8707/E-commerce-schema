@@ -1,5 +1,4 @@
 import logging
-import logging.handlers
 
 SENSITIVE_FIELDS = {"password", "token", "email", "authorization", "credit_card", "cvv"}
 
@@ -10,6 +9,14 @@ _fileHandler = logging.FileHandler("app.log")
 _fileHandler.setLevel(logging.DEBUG)
 _fileHandler.setFormatter(logging.Formatter(_fmt))
 logging.getLogger().addHandler(_fileHandler)
+
+_consoleHandler = logging.StreamHandler()
+_consoleHandler.setLevel(logging.DEBUG)
+_consoleHandler.setFormatter(logging.Formatter(_fmt))
+logging.getLogger().addHandler(_consoleHandler)
+
+logging.getLogger("watchfiles").setLevel(logging.WARNING)
+logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
