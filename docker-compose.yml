@@ -5,6 +5,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/cart_db
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
     volumes:
       - ./app.log:/app/app.log
     depends_on:
