@@ -1,0 +1,50 @@
+services:
+
+  app-stable:
+    build: .
+    ports:
+      - "8003:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cart_db
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app-canary:
+    build: .
+    ports:
+      - "8004:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cart_db
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/canary.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app-stable
+      - app-canary
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cart_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data_canary:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data_canary:
