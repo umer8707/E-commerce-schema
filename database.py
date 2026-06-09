@@ -14,4 +14,8 @@ class Base(DeclarativeBase):
 
 
 def createTables():
-    Base.metadata.create_all(bind=engine)
+    from sqlalchemy.exc import IntegrityError
+    try:
+        Base.metadata.create_all(bind=engine)
+    except IntegrityError:
+        pass
