@@ -2,11 +2,6 @@ import os
 import time
 
 from azure.monitor.opentelemetry import configure_azure_monitor
-
-_conn_str = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
-if _conn_str:
-    configure_azure_monitor(connection_string=_conn_str)
-
 from database import SessionLocal, createTables
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -16,6 +11,10 @@ from router import createRouter
 from service import CartService, ProductService, UserService
 from sqlalchemy import text
 from utils import logger
+
+_conn_str = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+if _conn_str:
+    configure_azure_monitor(connection_string=_conn_str)
 
 app = FastAPI()
 
