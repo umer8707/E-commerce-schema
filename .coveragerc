@@ -1,0 +1,9 @@
+[run]
+omit =
+    tests/*
+    seed.py
+
+[report]
+omit =
+    tests/*
+    seed.py
