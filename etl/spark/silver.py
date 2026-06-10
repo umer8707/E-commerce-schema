@@ -11,14 +11,14 @@ from datetime import date
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+from pyspark.sql import SparkSession  # noqa: E402
+from pyspark.sql import functions as F  # noqa: E402
 
-from config import (
+from config import (  # noqa: E402
     AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY,
     BRONZE_CONTAINER, SILVER_CONTAINER, TEMP_DIR,
 )
-from azure_utils import upload_dir, download_dir
+from azure_utils import upload_dir, download_dir  # noqa: E402
 
 TODAY = date.today().isoformat()
 

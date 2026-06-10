@@ -10,14 +10,14 @@ import shutil
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+from pyspark.sql import SparkSession  # noqa: E402
+from pyspark.sql import functions as F  # noqa: E402
 
-from config import (
+from config import (  # noqa: E402
     AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY,
     SILVER_CONTAINER, GOLD_CONTAINER, TEMP_DIR,
 )
-from azure_utils import upload_dir, download_dir
+from azure_utils import upload_dir, download_dir  # noqa: E402
 
 
 def _silver(spark, name: str):

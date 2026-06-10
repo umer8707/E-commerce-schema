@@ -9,13 +9,13 @@ from datetime import date
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pandas as pd
-from sqlalchemy import create_engine
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+import pandas as pd  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from pyspark.sql import SparkSession  # noqa: E402
+from pyspark.sql import functions as F  # noqa: E402
 
-from config import DATABASE_URL, AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, BRONZE_CONTAINER, TEMP_DIR
-from azure_utils import upload_dir
+from config import DATABASE_URL, AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, BRONZE_CONTAINER, TEMP_DIR  # noqa: E402
+from azure_utils import upload_dir  # noqa: E402
 
 TABLES = ["users", "products", "carts", "cart_items"]
 TODAY = date.today().isoformat()
