@@ -1,0 +1,4 @@
+pyspark==3.5.1
+psycopg2-binary==2.9.9
+azure-storage-blob==12.19.1
+pandas==2.2.1
