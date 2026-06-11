@@ -10,7 +10,11 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ""
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:5432/cart_db}
+    AIRFLOW__WEBSERVER__WORKERS: "1"
+    AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT: "300"
+    AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT: "300"
+    DATABASE_URL: postgresql://postgres:postgres123@host.docker.internal:5432/cart_db
+    TEMP_DIR: /tmp/etl
     AZURE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT}
     AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY}
   volumes:
