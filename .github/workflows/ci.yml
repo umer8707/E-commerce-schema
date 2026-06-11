@@ -73,22 +73,84 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and push
+      - name: Build and push green image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green
+            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest
 
   deploy:
-    name: Deploy to Azure App Service
+    name: Blue-Green Deploy to Azure App Service
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Deploy to Azure App Service
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Save current (blue) image tag
+        run: |
+          BLUE_TAG=$(docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue 2>/dev/null \
+            && echo "blue" || echo "latest")
+          echo "BLUE_TAG=$BLUE_TAG" >> $GITHUB_ENV
+          echo "Current blue tag: $BLUE_TAG"
+
+      - name: Tag current image as blue
+        run: |
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest || true
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest \
+            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue || true
+          docker push ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue || true
+
+      - name: Deploy green to Azure App Service
+        id: deploy_green
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_APP_NAME }}
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          images: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest
+          images: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green
+
+      - name: Health check green deployment
+        id: health_check
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.AZURE_APP_NAME }}.azurewebsites.net/health)
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "HEALTH=ok" >> $GITHUB_ENV
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "HEALTH=fail" >> $GITHUB_ENV
+          exit 1
+
+      - name: Rollback to blue on failure
+        if: failure() && steps.health_check.outcome == 'failure'
+        run: |
+          echo "Health check failed — rolling back to blue image"
+
+      - name: Rollback deploy blue to Azure
+        if: failure() && steps.health_check.outcome == 'failure'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          images: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
+
+      - name: Promote green to latest on success
+        if: success()
+        run: |
+          echo "Green deployment healthy — promoting to stable"
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green \
+            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
+          docker push ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
