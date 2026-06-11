@@ -123,15 +123,15 @@
                     ]}}],
                     "request": {
                         "method": "GET",
-                        "url": "{{base_url}}/users/99999"
+                        "url": "{{base_url}}/users/9999999"
                     }
                 },
                 {
                     "name": "08 - List Users",
                     "event": [{"listen": "test", "script": {"exec": [
                         "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
-                        "pm.test('Has at least 2 users', () => pm.expect(pm.response.json().length).to.be.gte(2));"
+                        "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));",
+                        "pm.test('Has at least 2 users', () => pm.expect(pm.response.json().data.length).to.be.gte(2));"
                     ]}}],
                     "request": {
                         "method": "GET",
@@ -164,9 +164,9 @@
                     "name": "10 - List Products Non-Empty",
                     "event": [{"listen": "test", "script": {"exec": [
                         "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
-                        "pm.test('Has at least 2 products', () => pm.expect(pm.response.json().length).to.be.gte(2));",
-                        "pm.collectionVariables.set('product_count_after_bulk', pm.response.json().length);"
+                        "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));",
+                        "pm.test('Has at least 2 products', () => pm.expect(pm.response.json().data.length).to.be.gte(2));",
+                        "pm.collectionVariables.set('product_count_after_bulk', pm.response.json().total);"
                     ]}}],
                     "request": {
                         "method": "GET",
@@ -194,7 +194,7 @@
                         "pm.test('Status 200', () => pm.response.to.have.status(200));",
                         "pm.test('Has one more product than before bulk', () => {",
                         "    const before = parseInt(pm.collectionVariables.get('product_count_after_bulk'));",
-                        "    pm.expect(pm.response.json().length).to.eql(before + 1);",
+                        "    pm.expect(pm.response.json().total).to.eql(before + 1);",
                         "});"
                     ]}}],
                     "request": {
@@ -319,7 +319,7 @@
                     ]}}],
                     "request": {
                         "method": "POST",
-                        "url": "{{base_url}}/cart/99999"
+                        "url": "{{base_url}}/cart/9999999"
                     }
                 }
             ]
@@ -519,7 +519,7 @@
                         "method": "POST",
                         "url": "{{base_url}}/cart/{{user_id}}/items",
                         "header": [{"key": "Content-Type", "value": "application/json"}],
-                        "body": {"mode": "raw", "raw": "{\"product_id\": 9999, \"quantity\": 1}"}
+                        "body": {"mode": "raw", "raw": "{\"product_id\": 9999999, \"quantity\": 1}"}
                     }
                 },
                 {
@@ -686,15 +686,14 @@
                     "event": [{"listen": "test", "script": {"exec": [
                         "pm.test('Status 200', () => pm.response.to.have.status(200));",
                         "pm.test('Shoes stock reduced by 5', () => {",
-                        "    const pid = parseInt(pm.collectionVariables.get('product_id'));",
-                        "    const shoes = pm.response.json().find(p => p.id === pid);",
+                        "    const shoes = pm.response.json();",
                         "    const initialStock = parseInt(pm.collectionVariables.get('initial_shoes_stock'));",
                         "    pm.expect(shoes.stock).to.eql(initialStock - 5);",
                         "});"
                     ]}}],
                     "request": {
                         "method": "GET",
-                        "url": "{{base_url}}/products"
+                        "url": "{{base_url}}/products/{{product_id}}"
                     }
                 },
                 {
