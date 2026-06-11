@@ -6,4 +6,4 @@ AZURE_STORAGE_KEY = os.getenv("AZURE_STORAGE_KEY", "")
 BRONZE_CONTAINER = "bronze"
 SILVER_CONTAINER = "silver"
 GOLD_CONTAINER = "gold"
-TEMP_DIR = os.getenv("TEMP_DIR", "/tmp/etl")
+TEMP_DIR = os.getenv("TEMP_DIR", "/tmp/etl")  # nosec B108

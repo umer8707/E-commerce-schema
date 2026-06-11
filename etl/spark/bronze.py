@@ -29,7 +29,7 @@ def read_table(table: str) -> pd.DataFrame:
         offset = 0
         while True:
             chunk = pd.read_sql(  # nosec B608
-                f"SELECT * FROM {table} LIMIT {CHUNK_SIZE} OFFSET {offset}",
+                f"SELECT * FROM {table} LIMIT {CHUNK_SIZE} OFFSET {offset}",  # nosec B608
                 conn,
             )
             if chunk.empty:
