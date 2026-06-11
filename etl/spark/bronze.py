@@ -9,6 +9,7 @@ from datetime import date
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import psycopg2  # noqa: E402
 import pandas as pd  # noqa: E402
 from pyspark.sql import SparkSession  # noqa: E402
 from pyspark.sql import functions as F  # noqa: E402
@@ -22,11 +23,23 @@ CHUNK_SIZE = 50_000
 
 
 def read_table(table: str) -> pd.DataFrame:
-    chunks = []
-    for chunk in pd.read_sql(f"SELECT * FROM {table}", DATABASE_URL, chunksize=CHUNK_SIZE):  # nosec B608
-        chunks.append(chunk)
-        print(f"    read {sum(len(c) for c in chunks):,} rows...", end="\r")
-    return pd.concat(chunks, ignore_index=True)
+    conn = psycopg2.connect(DATABASE_URL)
+    try:
+        chunks = []
+        offset = 0
+        while True:
+            chunk = pd.read_sql(  # nosec B608
+                f"SELECT * FROM {table} LIMIT {CHUNK_SIZE} OFFSET {offset}",
+                conn,
+            )
+            if chunk.empty:
+                break
+            chunks.append(chunk)
+            offset += CHUNK_SIZE
+            print(f"    read {offset:,} rows...", end="\r")
+        return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+    finally:
+        conn.close()
 
 
 def main():
