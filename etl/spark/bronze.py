@@ -10,7 +10,6 @@ from datetime import date
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pandas as pd  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
 from pyspark.sql import SparkSession  # noqa: E402
 from pyspark.sql import functions as F  # noqa: E402
 
@@ -22,12 +21,11 @@ TODAY = date.today().isoformat()
 CHUNK_SIZE = 50_000
 
 
-def read_table(engine, table: str) -> pd.DataFrame:
+def read_table(table: str) -> pd.DataFrame:
     chunks = []
-    with engine.connect() as conn:
-        for chunk in pd.read_sql(f"SELECT * FROM {table}", conn, chunksize=CHUNK_SIZE):  # nosec B608
-            chunks.append(chunk)
-            print(f"    read {sum(len(c) for c in chunks):,} rows...", end="\r")
+    for chunk in pd.read_sql(f"SELECT * FROM {table}", DATABASE_URL, chunksize=CHUNK_SIZE):  # nosec B608
+        chunks.append(chunk)
+        print(f"    read {sum(len(c) for c in chunks):,} rows...", end="\r")
     return pd.concat(chunks, ignore_index=True)
 
 
@@ -40,11 +38,10 @@ def main():
     )
     spark.sparkContext.setLogLevel("WARN")
 
-    engine = create_engine(DATABASE_URL)
     try:
         for table in TABLES:
             print(f"Extracting {table}...")
-            pdf = read_table(engine, table)
+            pdf = read_table(table)
             print(f"    loaded {len(pdf):,} rows, converting to Spark...")
 
             df = spark.createDataFrame(pdf)
@@ -63,7 +60,6 @@ def main():
             )
             print(f"  → {len(pdf):,} rows written to bronze/{table}")
     finally:
-        engine.dispose()
         spark.stop()
 
     print("Bronze layer complete.")
