@@ -24,9 +24,10 @@ CHUNK_SIZE = 50_000
 
 def read_table(engine, table: str) -> pd.DataFrame:
     chunks = []
-    for chunk in pd.read_sql(f"SELECT * FROM {table}", engine, chunksize=CHUNK_SIZE):  # nosec B608
-        chunks.append(chunk)
-        print(f"    read {sum(len(c) for c in chunks):,} rows...", end="\r")
+    with engine.connect() as conn:
+        for chunk in pd.read_sql(f"SELECT * FROM {table}", conn, chunksize=CHUNK_SIZE):  # nosec B608
+            chunks.append(chunk)
+            print(f"    read {sum(len(c) for c in chunks):,} rows...", end="\r")
     return pd.concat(chunks, ignore_index=True)
 
 
