@@ -83,74 +83,64 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest
 
   deploy:
-    name: Blue-Green Deploy to Azure App Service
+    name: Blue-Green Deploy to Azure Container Apps
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Save current (blue) image tag
+      - name: Enable multiple revision mode
         run: |
-          BLUE_TAG=$(docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue 2>/dev/null \
-            && echo "blue" || echo "latest")
-          echo "BLUE_TAG=$BLUE_TAG" >> $GITHUB_ENV
-          echo "Current blue tag: $BLUE_TAG"
+          az containerapp revision set-mode \
+            --name ${{ secrets.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --mode multiple
 
-      - name: Tag current image as blue
-        run: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest || true
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:latest \
-            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue || true
-          docker push ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue || true
-
-      - name: Deploy green to Azure App Service
+      - name: Deploy green revision (0% traffic)
         id: deploy_green
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          images: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green
+        run: |
+          SUFFIX="green-${{ github.run_number }}"
+          az containerapp update \
+            --name ${{ secrets.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green \
+            --revision-suffix $SUFFIX
+          echo "REVISION_NAME=${{ secrets.AZURE_CONTAINER_APP_NAME }}--$SUFFIX" >> $GITHUB_ENV
 
-      - name: Health check green deployment
+      - name: Health check green revision
         id: health_check
         run: |
-          echo "Waiting for deployment to stabilize..."
+          GREEN_URL="https://${{ env.REVISION_NAME }}.redflower-743b2e51.southeastasia.azurecontainerapps.io/health"
+          echo "Health checking: $GREEN_URL"
           sleep 30
           for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.AZURE_APP_NAME }}.azurewebsites.net/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$GREEN_URL")
             echo "Attempt $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
-              echo "HEALTH=ok" >> $GITHUB_ENV
               exit 0
             fi
             sleep 10
           done
-          echo "HEALTH=fail" >> $GITHUB_ENV
           exit 1
 
-      - name: Rollback to blue on failure
-        if: failure() && steps.health_check.outcome == 'failure'
-        run: |
-          echo "Health check failed — rolling back to blue image"
-
-      - name: Rollback deploy blue to Azure
-        if: failure() && steps.health_check.outcome == 'failure'
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          images: ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
-
-      - name: Promote green to latest on success
+      - name: Promote green to 100% traffic
         if: success()
         run: |
-          echo "Green deployment healthy — promoting to stable"
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:green \
-            ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
-          docker push ${{ secrets.DOCKER_USERNAME }}/ecommerce-cart:blue
+          az containerapp ingress traffic set \
+            --name ${{ secrets.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --revision-weight "${{ env.REVISION_NAME }}=100"
+          echo "Green promoted — serving 100% traffic"
+
+      - name: Rollback — deactivate green on failure
+        if: failure() && steps.health_check.outcome == 'failure'
+        run: |
+          az containerapp revision deactivate \
+            --name ${{ secrets.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --revision "${{ env.REVISION_NAME }}"
+          echo "Health check failed — green deactivated, blue still serving 100%"
